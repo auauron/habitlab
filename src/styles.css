@@ -377,6 +377,9 @@ a {
 .landing-stage {
   position: relative;
   min-height: 560px;
+  width: 100%;
+  max-width: 500px;
+  justify-self: center;
 }
 
 .landing-stage::before {
@@ -518,7 +521,7 @@ a {
 
 .landing-panel-row {
   width: min(1200px, 100%);
-  margin: -22px auto 0;
+  margin: 40px auto 0;
 }
 
 .landing-live-panel {
