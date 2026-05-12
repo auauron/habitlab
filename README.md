@@ -47,7 +47,7 @@ Set:
 
 ```txt
 VITE_SUPABASE_URL=https://your-project-ref.supabase.co
-VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+VITE_SUPABASE_KEY=your-supabase-publishable-key
 ```
 
 Apply the schema in:
