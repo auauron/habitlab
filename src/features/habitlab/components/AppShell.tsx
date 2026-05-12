@@ -8,6 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import type { ReactNode } from 'react'
+import { useHabitLab } from '../HabitLabProvider'
 
 const navItems = [
   { to: '/today', label: 'Today', icon: CalendarCheck2 },
@@ -30,6 +31,8 @@ export default function AppShell({
   title = 'HabitLab',
   subtitle = 'A calm space for habits, mood, and small reflections.',
 }: AppShellProps) {
+  const { isSignedIn, userLabel } = useHabitLab()
+
   return (
     <div className="app-shell">
       <aside className="desktop-rail">
@@ -67,7 +70,7 @@ export default function AppShell({
           </div>
           <Link to="/settings" className="profile-pill">
             <span className="profile-dot" />
-            <span>Auauron</span>
+            <span>{isSignedIn ? userLabel : 'Sign in'}</span>
           </Link>
         </header>
 

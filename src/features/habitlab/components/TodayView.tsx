@@ -8,14 +8,16 @@ import {
   Sparkles,
   Timer,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   calculateCompletionPercent,
   getTodayHabitRows,
 } from '../domain'
-import { demoHabits, demoLogs, demoToday } from '../demoData'
+import { formatLongDate } from '../backend'
+import { useHabitLab } from '../HabitLabProvider'
 import type { HabitLogStatus, Mood } from '../types'
 import AppShell from './AppShell'
+import AuthPanel from './AuthPanel'
 import GlassCard from './GlassCard'
 
 const iconMap = {
@@ -35,45 +37,54 @@ const moods: Array<{ value: Mood; label: string }> = [
 ]
 
 export default function TodayView() {
-  const [statuses, setStatuses] = useState<Record<string, HabitLogStatus>>(() =>
-    Object.fromEntries(demoLogs.map((log) => [log.habitId, log.status])),
-  )
+  const {
+    checkins,
+    error,
+    habits,
+    isLoading,
+    isSignedIn,
+    logs,
+    notice,
+    saveCheckin,
+    setHabitStatus,
+    today,
+  } = useHabitLab()
   const [mood, setMood] = useState<Mood>('clear')
   const [energy, setEnergy] = useState(4)
-  const [reflection, setReflection] = useState(
-    'I want today to feel light, focused, and intentional.',
-  )
+  const [reflection, setReflection] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
 
-  const logs = useMemo(
-    () =>
-      demoHabits.map((habit) => ({
-        id: `today-${habit.id}`,
-        habitId: habit.id,
-        date: demoToday,
-        status: statuses[habit.id] ?? 'pending',
-      })),
-    [statuses],
-  )
+  const currentCheckin = checkins.find((entry) => entry.date === today)
 
   const rows = getTodayHabitRows({
-    date: demoToday,
-    habits: demoHabits,
+    date: today,
+    habits,
     logs,
   })
   const completion = calculateCompletionPercent(rows)
   const completed = rows.filter((row) => row.status === 'complete').length
 
-  function cycleStatus(habitId: string) {
-    setStatuses((current) => {
-      const status = current[habitId] ?? 'pending'
-      const next =
-        status === 'pending'
-          ? 'complete'
-          : status === 'complete'
-            ? 'skip'
-            : 'pending'
-      return { ...current, [habitId]: next }
-    })
+  useEffect(() => {
+    setMood(currentCheckin?.mood ?? 'clear')
+    setEnergy(currentCheckin?.energy ?? 4)
+    setReflection(currentCheckin?.reflection ?? '')
+  }, [currentCheckin])
+
+  async function cycleStatus(habitId: string, status: HabitLogStatus) {
+    const next =
+      status === 'pending'
+        ? 'complete'
+        : status === 'complete'
+          ? 'skip'
+          : 'pending'
+
+    await setHabitStatus(habitId, today, next)
+  }
+
+  async function handleSave() {
+    setIsSaving(true)
+    await saveCheckin(today, { mood, energy, reflection })
+    setIsSaving(false)
   }
 
   return (
@@ -82,14 +93,26 @@ export default function TodayView() {
       title="Good morning"
       subtitle="Move through the day gently: complete what matters, notice your energy, and leave one honest note."
     >
-      <div className="today-grid">
+      {!isSignedIn ? <AuthPanel /> : null}
+      {isSignedIn && isLoading ? (
+        <GlassCard className="state-card p-5 sm:p-6">Loading your Supabase workspace...</GlassCard>
+      ) : null}
+      {isSignedIn && error ? (
+        <GlassCard className="state-card p-5 sm:p-6 error-state">{error}</GlassCard>
+      ) : null}
+      {isSignedIn && notice ? (
+        <p className="status-message is-ok app-notice">{notice}</p>
+      ) : null}
+      {isSignedIn && !isLoading ? (
+        <div className="today-grid">
         <GlassCard className="hero-checkin p-6 sm:p-8" tone="blue">
           <div className="hero-copy">
-            <p className="eyebrow">Tuesday, May 12</p>
+            <p className="eyebrow">{formatLongDate(today)}</p>
             <h2>{completion}% complete</h2>
             <p>
-              {completed} of {rows.length} habits are complete. Keep the pace
-              calm; consistency counts more than intensity.
+              {rows.length > 0
+                ? `${completed} of ${rows.length} habits are complete. Keep the pace calm; consistency counts more than intensity.`
+                : 'No active habits yet. Add your first real habit in Supabase from the Habits screen.'}
             </p>
           </div>
           <div
@@ -115,6 +138,12 @@ export default function TodayView() {
           </div>
 
           <div className="habit-list">
+            {rows.length === 0 ? (
+              <div className="empty-state">
+                <BookOpen size={22} />
+                <p>Create your first habit on the Habits screen to start tracking real backend rows.</p>
+              </div>
+            ) : null}
             {rows.map(({ habit, status }) => {
               const Icon = iconMap[habit.icon as keyof typeof iconMap] ?? Sparkles
               return (
@@ -122,7 +151,7 @@ export default function TodayView() {
                   key={habit.id}
                   type="button"
                   className={`habit-row status-${status}`}
-                  onClick={() => cycleStatus(habit.id)}
+                  onClick={() => cycleStatus(habit.id, status)}
                 >
                   <span className="habit-icon">
                     <Icon size={20} strokeWidth={2.15} />
@@ -189,11 +218,17 @@ export default function TodayView() {
             onChange={(event) => setReflection(event.target.value)}
             rows={5}
           />
-          <button type="button" className="primary-action">
-            Save today&apos;s check-in
+          <button
+            type="button"
+            className="primary-action"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? 'Saving...' : "Save today's check-in"}
           </button>
         </GlassCard>
-      </div>
+        </div>
+      ) : null}
     </AppShell>
   )
 }

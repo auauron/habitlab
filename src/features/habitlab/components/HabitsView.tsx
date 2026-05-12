@@ -1,16 +1,62 @@
 import { Archive, Bell, Plus, Sparkles } from 'lucide-react'
+import type { FormEvent } from 'react'
+import { useState } from 'react'
 import { calculateCurrentStreak } from '../domain'
-import { demoHabits, demoLogs, demoToday } from '../demoData'
+import { useHabitLab } from '../HabitLabProvider'
+import type { HabitCadence } from '../types'
 import AppShell from './AppShell'
+import AuthPanel from './AuthPanel'
 import GlassCard from './GlassCard'
 
+const iconOptions = ['Sparkles', 'Droplets', 'Footprints', 'BookOpen', 'Timer']
+const colorOptions = ['sky', 'blue', 'cyan', 'violet']
+
 export default function HabitsView() {
+  const {
+    addHabit,
+    archiveHabit,
+    error,
+    habits,
+    isLoading,
+    isSignedIn,
+    logs,
+    today,
+  } = useHabitLab()
+  const [name, setName] = useState('')
+  const [cadence, setCadence] = useState<HabitCadence>('daily')
+  const [icon, setIcon] = useState('Sparkles')
+  const [color, setColor] = useState('sky')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!name.trim()) return
+
+    setIsSubmitting(true)
+    await addHabit({
+      name: name.trim(),
+      cadence,
+      icon,
+      color,
+    })
+    setName('')
+    setIsSubmitting(false)
+  }
+
   return (
     <AppShell
       eyebrow="Habit design"
       title="Habits"
       subtitle="Shape the rituals that make your day feel lighter, clearer, and more intentional."
     >
+      {!isSignedIn ? <AuthPanel /> : null}
+      {isSignedIn && isLoading ? (
+        <GlassCard className="state-card p-5 sm:p-6">Loading habits from Supabase...</GlassCard>
+      ) : null}
+      {isSignedIn && error ? (
+        <GlassCard className="state-card p-5 sm:p-6 error-state">{error}</GlassCard>
+      ) : null}
+      {isSignedIn && !isLoading ? (
       <div className="content-grid">
         <GlassCard className="p-5 sm:p-6" tone="blue">
           <div className="section-heading">
@@ -18,10 +64,16 @@ export default function HabitsView() {
               <p className="eyebrow">Active habits</p>
               <h2>Your rhythm</h2>
             </div>
-            <span className="soft-badge">{demoHabits.length} habits</span>
+            <span className="soft-badge">{habits.length} habits</span>
           </div>
           <div className="management-list">
-            {demoHabits.map((habit) => (
+            {habits.length === 0 ? (
+              <div className="empty-state">
+                <Sparkles size={22} />
+                <p>No backend habits yet. Add one and it will be inserted into Supabase.</p>
+              </div>
+            ) : null}
+            {habits.map((habit) => (
               <article key={habit.id} className="management-row">
                 <span className={`color-well color-${habit.color}`} />
                 <div>
@@ -30,13 +82,17 @@ export default function HabitsView() {
                     {habit.cadence} cadence ·{' '}
                     {calculateCurrentStreak({
                       habitId: habit.id,
-                      throughDate: demoToday,
-                      logs: demoLogs,
+                      throughDate: today,
+                      logs,
                     })}{' '}
                     day streak
                   </p>
                 </div>
-                <button type="button" aria-label={`Archive ${habit.name}`}>
+                <button
+                  type="button"
+                  aria-label={`Archive ${habit.name}`}
+                  onClick={() => archiveHabit(habit.id)}
+                >
                   <Archive size={18} />
                 </button>
               </article>
@@ -47,26 +103,52 @@ export default function HabitsView() {
         <GlassCard className="p-5 sm:p-6">
           <p className="eyebrow">Create</p>
           <h2 className="panel-title">New habit</h2>
-          <div className="mock-form">
+          <form className="habit-form" onSubmit={handleSubmit}>
             <label>
               Name
-              <input value="Evening screen sunset" readOnly />
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Evening screen sunset"
+                maxLength={120}
+              />
             </label>
             <label>
               Frequency
-              <select value="daily" readOnly>
+              <select
+                value={cadence}
+                onChange={(event) => setCadence(event.target.value as HabitCadence)}
+              >
                 <option value="daily">Daily</option>
+                <option value="weekdays">Weekdays</option>
+                <option value="weekly">Weekly</option>
               </select>
             </label>
             <label>
-              Reminder
-              <input value="8:30 PM" readOnly />
+              Icon
+              <select value={icon} onChange={(event) => setIcon(event.target.value)}>
+                {iconOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
             </label>
-          </div>
-          <button type="button" className="primary-action">
-            <Plus size={18} />
-            Add habit
-          </button>
+            <label>
+              Color
+              <select value={color} onChange={(event) => setColor(event.target.value)}>
+                {colorOptions.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="submit" className="primary-action" disabled={isSubmitting}>
+              <Plus size={18} />
+              {isSubmitting ? 'Adding...' : 'Add habit'}
+            </button>
+          </form>
         </GlassCard>
 
         <GlassCard className="p-5 sm:p-6" tone="strong">
@@ -86,12 +168,13 @@ export default function HabitsView() {
               <h2>Personal tuning</h2>
               <p>
                 Every habit can have its own icon, color, cadence, and archive
-                state once Supabase persistence is connected.
+                state. Changes are now persisted in Supabase.
               </p>
             </div>
           </div>
         </GlassCard>
       </div>
+      ) : null}
     </AppShell>
   )
 }
