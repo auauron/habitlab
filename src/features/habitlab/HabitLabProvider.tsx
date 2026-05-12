@@ -32,7 +32,7 @@ type HabitLabContextValue = {
   checkins: DailyCheckin[]
   error: string | null
   notice: string | null
-  signInWithEmail: (email: string) => Promise<void>
+  authenticate: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   refresh: () => Promise<void>
   addHabit: (draft: HabitDraft) => Promise<void>
@@ -127,7 +127,7 @@ export function HabitLabProvider({ children }: { children: React.ReactNode }) {
       checkins,
       error,
       notice,
-      signInWithEmail: async (email: string) => {
+      authenticate: async (email: string, password: string) => {
         if (!supabase) {
           setError('Supabase is not configured.')
           return
@@ -136,22 +136,32 @@ export function HabitLabProvider({ children }: { children: React.ReactNode }) {
         setError(null)
         setNotice(null)
 
-        const { error: signInError } = await supabase.auth.signInWithOtp({
+        const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
-          options: {
-            emailRedirectTo:
-              typeof window === 'undefined'
-                ? undefined
-                : `${window.location.origin}/today`,
-          },
+          password,
         })
 
         if (signInError) {
+          if (signInError.message.toLowerCase().includes('invalid login credentials')) {
+            const { error: signUpError, data: signUpData } = await supabase.auth.signUp({
+              email,
+              password,
+            })
+
+            if (signUpError) {
+              setError(signUpError.message)
+              return
+            }
+            
+            if (!signUpData.session) {
+              setNotice('Account created! Please check your email for a confirmation link, or disable "Confirm email" in your Supabase Auth dashboard settings.')
+            }
+            return
+          }
+
           setError(signInError.message)
           return
         }
-
-        setNotice('Magic link sent. Open it to unlock your HabitLab data.')
       },
       signOut: async () => {
         if (!supabase) return

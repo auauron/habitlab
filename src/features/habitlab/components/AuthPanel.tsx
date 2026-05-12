@@ -9,16 +9,17 @@ type AuthPanelProps = {
 }
 
 export default function AuthPanel({ compact = false }: AuthPanelProps) {
-  const { error, isConfigured, notice, signInWithEmail } = useHabitLab()
+  const { error, isConfigured, notice, authenticate } = useHabitLab()
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!email.trim()) return
+    if (!email.trim() || !password) return
 
     setIsSubmitting(true)
-    await signInWithEmail(email.trim())
+    await authenticate(email.trim(), password)
     setIsSubmitting(false)
   }
 
@@ -50,13 +51,26 @@ export default function AuthPanel({ compact = false }: AuthPanelProps) {
             />
           </span>
         </label>
+        <label>
+          Password
+          <span>
+            <KeyRound size={17} />
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Your password"
+              disabled={!isConfigured || isSubmitting}
+            />
+          </span>
+        </label>
         <button
           type="submit"
           className="primary-action"
           disabled={!isConfigured || isSubmitting}
         >
           {isSubmitting ? <Loader2 className="spin" size={18} /> : <ShieldCheck size={18} />}
-          Send magic link
+          Sign in / Sign up
         </button>
       </form>
 
